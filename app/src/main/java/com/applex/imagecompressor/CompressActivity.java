@@ -6,16 +6,13 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import android.Manifest;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
-import android.util.Log;
+import android.view.Display;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
@@ -36,6 +33,7 @@ public class CompressActivity extends AppCompatActivity implements SelectPhotoDi
     private Bitmap mSelectedBitmap;
     private Uri mSelectedUri;
     private int quality;
+    Button button;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,7 +43,7 @@ public class CompressActivity extends AppCompatActivity implements SelectPhotoDi
         verifyPermissions();
         img = findViewById(R.id.imageView1);
 
-        Button button = findViewById(R.id.button1);
+        button = findViewById(R.id.button1);
         button.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -56,9 +54,25 @@ public class CompressActivity extends AppCompatActivity implements SelectPhotoDi
 
     @Override
     public void getImagePath(Uri imagePath) {
-        Picasso.get().load(imagePath.toString()).into(img);
         mSelectedBitmap = null;
         mSelectedUri = imagePath;
+        Bitmap bmap = bmap();
+        int h = bmap.getHeight();
+        int w = bmap.getWidth();
+        Display display = getWindowManager().getDefaultDisplay();
+        if(h > w) {
+            Picasso.get()
+                    .load(imagePath.toString())
+                    .resize(img.getWidth(), (int) (0.75*(display.getHeight())))
+                    .centerCrop()
+                    .into(img);
+        } else {
+            Picasso.get()
+                    .load(imagePath.toString())
+                    .fit()
+                    .centerInside()
+                    .into(img);
+        }
     }
 
     @Override
@@ -110,6 +124,21 @@ public class CompressActivity extends AppCompatActivity implements SelectPhotoDi
             file.delete ();
         try {
             FileOutputStream out = new FileOutputStream(file);
+//          FIRST LOGIC:
+//            while (true) {
+//                if(predictSize(finalBitmap) <= 200) {
+//                    finalBitmap.compress(Bitmap.CompressFormat.JPEG, 100, out);
+//                    break;
+//                }
+//                else {
+//                    finalBitmap.compress(Bitmap.CompressFormat.JPEG, 75, out);
+//                }
+//            }
+//          SECOND LOGIC:
+//            while(predictSize(finalBitmap) > 200) {
+//                finalBitmap.compress(Bitmap.CompressFormat.JPEG, 75, out);
+//            }
+//            finalBitmap.compress(Bitmap.CompressFormat.JPEG, 100, out);
             finalBitmap.compress(Bitmap.CompressFormat.JPEG, getQuality(), out);
             out.flush();
             out.close();
@@ -146,6 +175,9 @@ public class CompressActivity extends AppCompatActivity implements SelectPhotoDi
             quality = 10;
         } else if (size > 8000) {
             quality = 5;
+        }
+        while (size < 150) {
+
         }
         return quality;
     }
