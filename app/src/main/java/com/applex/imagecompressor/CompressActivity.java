@@ -8,6 +8,7 @@ import androidx.core.content.ContextCompat;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -113,7 +114,21 @@ public class CompressActivity extends AppCompatActivity implements SelectPhotoDi
         return length;
     }
 
+    private Bitmap iterationCompress(Bitmap img) {
+        long size = predictSize(img);
+        while(size > 200) {
+            ByteArrayOutputStream ou = new ByteArrayOutputStream();
+            img.compress(Bitmap.CompressFormat.JPEG, 75, ou);
+            size = predictSize(img);
+        }
+        Toast.makeText(getApplicationContext(), ""+size, Toast.LENGTH_LONG).show();
+        return img;
+    }
+
     private void saveImage(Bitmap finalBitmap) {
+        Toast.makeText(getApplicationContext(), "STarting", Toast.LENGTH_LONG).show();
+
+        finalBitmap = iterationCompress(finalBitmap);
         String root = Environment.getExternalStorageDirectory().toString();
         File myDir = new File(root + "/saved_images");
         if (!myDir.exists()) {
@@ -139,7 +154,8 @@ public class CompressActivity extends AppCompatActivity implements SelectPhotoDi
 //                finalBitmap.compress(Bitmap.CompressFormat.JPEG, 75, out);
 //            }
 //            finalBitmap.compress(Bitmap.CompressFormat.JPEG, 100, out);
-            finalBitmap.compress(Bitmap.CompressFormat.JPEG, getQuality(), out);
+            finalBitmap.compress(Bitmap.CompressFormat.JPEG, 100, out);
+            Toast.makeText(getApplicationContext(), "Done", Toast.LENGTH_LONG).show();
             out.flush();
             out.close();
 
