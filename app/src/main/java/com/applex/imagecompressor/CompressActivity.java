@@ -48,6 +48,7 @@ public class CompressActivity extends AppCompatActivity implements SelectPhotoDi
         button.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
+
                 saveImage(bmap());
             }
         });
@@ -127,8 +128,10 @@ public class CompressActivity extends AppCompatActivity implements SelectPhotoDi
 
     private void saveImage(Bitmap finalBitmap) {
         Toast.makeText(getApplicationContext(), "STarting", Toast.LENGTH_LONG).show();
+        long size = predictSize(finalBitmap);
+        Toast.makeText(getApplicationContext(), ""+size, Toast.LENGTH_LONG).show();
 
-        finalBitmap = iterationCompress(finalBitmap);
+//        finalBitmap = iterationCompress(finalBitmap);
         String root = Environment.getExternalStorageDirectory().toString();
         File myDir = new File(root + "/saved_images");
         if (!myDir.exists()) {
