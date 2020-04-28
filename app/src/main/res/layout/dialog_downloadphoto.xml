@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="15dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:text="Save to internal"
+        android:textSize="18sp"
+        android:textColor="#212121"
+        android:id="@+id/saveToInternal"
+        android:gravity="center_vertical"/>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:text="Share external"
+        android:textSize="18sp"
+        android:textColor="#212121"
+        android:layout_below="@id/saveToInternal"
+        android:gravity="center_vertical"
+        android:id="@+id/shareExternal"/>
+
+</RelativeLayout>

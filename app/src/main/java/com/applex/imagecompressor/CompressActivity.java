@@ -4,14 +4,17 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Matrix;
+import android.graphics.Paint;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.Environment;
 import android.provider.MediaStore;
 import android.view.Display;
 import android.view.View;
@@ -19,12 +22,8 @@ import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.Toast;
-
 import com.squareup.picasso.Picasso;
-
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 
 public class CompressActivity extends AppCompatActivity implements SelectPhotoDialog.OnPhotoSelectedListener  {
@@ -33,8 +32,10 @@ public class CompressActivity extends AppCompatActivity implements SelectPhotoDi
     ImageView img;
     private Bitmap mSelectedBitmap;
     private Uri mSelectedUri;
-    private int quality;
     Button button;
+    private byte[] mCompressBitmap;
+
+    byte[] pic;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,55 +43,145 @@ public class CompressActivity extends AppCompatActivity implements SelectPhotoDi
         setContentView(R.layout.activity_compress);
 
         verifyPermissions();
-        img = findViewById(R.id.imageView1);
 
         button = findViewById(R.id.button1);
         button.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
+                Bitmap bmp = bmap();
+                ByteArrayOutputStream outpput = new ByteArrayOutputStream();
+                bmp.compress(Bitmap.CompressFormat.JPEG, 100, outpput);
+                pic = outpput.toByteArray();
+                new ImageCompressor().execute();
+            }
+        });
 
-                saveImage(bmap());
+        img = findViewById(R.id.imageView1);
+        img.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Bitmap bmp = bmap();
+                ByteArrayOutputStream outpput = new ByteArrayOutputStream();
+                bmp.compress(Bitmap.CompressFormat.JPEG, 100, outpput);
+                pic = outpput.toByteArray();
+                Intent intent2 = new Intent(CompressActivity.this, ImageActivity.class);
+                intent2.putExtra("BitmapByteArray",new ImageCompressor().doInBackground());
+                startActivity(intent2);
             }
         });
     }
 
-    @Override
-    public void getImagePath(Uri imagePath) {
-        mSelectedBitmap = null;
-        mSelectedUri = imagePath;
-        Bitmap bmap = bmap();
-        int h = bmap.getHeight();
-        int w = bmap.getWidth();
-        Display display = getWindowManager().getDefaultDisplay();
-        if(h > w) {
-            Picasso.get()
-                    .load(imagePath.toString())
-                    .resize(img.getWidth(), (int) (0.75*(display.getHeight())))
-                    .centerCrop()
-                    .into(img);
-        } else {
-            Picasso.get()
-                    .load(imagePath.toString())
-                    .fit()
-                    .centerInside()
-                    .into(img);
+    private class ImageCompressor extends AsyncTask<Void, Void, byte[]> {
+
+        private static final float maxHeight = 1280.0f;
+        private static final float maxWidth = 1280.0f;
+        byte[] actualPic =  pic;
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
         }
+
+        @Override
+        protected byte[] doInBackground(Void... strings) {
+            Bitmap scaledBitmap = null;
+
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inJustDecodeBounds = true;
+            Bitmap bmp = BitmapFactory.decodeByteArray(pic, 0, actualPic.length, options);
+
+            int actualHeight = options.outHeight;
+            int actualWidth = options.outWidth;
+
+            float imgRatio = (float) actualWidth / (float) actualHeight;
+            float maxRatio = maxWidth / maxHeight;
+
+            if (actualHeight > maxHeight || actualWidth > maxWidth) {
+                if (imgRatio < maxRatio) {
+                    imgRatio = maxHeight / actualHeight;
+                    actualWidth = (int) (imgRatio * actualWidth);
+                    actualHeight = (int) maxHeight;
+                } else if (imgRatio > maxRatio) {
+                    imgRatio = maxWidth / actualWidth;
+                    actualHeight = (int) (imgRatio * actualHeight);
+                    actualWidth = (int) maxWidth;
+                } else {
+                    actualHeight = (int) maxHeight;
+                    actualWidth = (int) maxWidth;
+
+                }
+            }
+
+            options.inSampleSize = calculateInSampleSize(options, actualWidth, actualHeight);
+            options.inJustDecodeBounds = false;
+            options.inDither = false;
+            options.inPurgeable = true;
+            options.inInputShareable = true;
+            options.inTempStorage = new byte[16 * 1024];
+
+            try {
+                bmp = BitmapFactory.decodeByteArray(pic, 0, actualPic.length, options);
+            } catch (OutOfMemoryError exception) {
+                exception.printStackTrace();
+
+            }
+            try {
+                scaledBitmap = Bitmap.createBitmap(actualWidth, actualHeight, Bitmap.Config.RGB_565);
+            } catch (OutOfMemoryError exception) {
+                exception.printStackTrace();
+            }
+
+            float ratioX = actualWidth / (float) options.outWidth;
+            float ratioY = actualHeight / (float) options.outHeight;
+            float middleX = actualWidth / 2.0f;
+            float middleY = actualHeight / 2.0f;
+
+            Matrix scaleMatrix = new Matrix();
+            scaleMatrix.setScale(ratioX, ratioY, middleX, middleY);
+
+            Canvas canvas = new Canvas(scaledBitmap);
+            canvas.setMatrix(scaleMatrix);
+            canvas.drawBitmap(bmp, middleX - bmp.getWidth() / 2, middleY - bmp.getHeight() / 2, new Paint(Paint.FILTER_BITMAP_FLAG));
+
+            if(bmp!=null)
+            {
+                bmp.recycle();
+            }
+            scaledBitmap = Bitmap.createBitmap(scaledBitmap, 0, 0, scaledBitmap.getWidth(), scaledBitmap.getHeight());
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 80, out);
+            byte[] by = out.toByteArray();
+            mCompressBitmap = by;
+            return by;
+        }
+
+        @Override
+        protected void onPostExecute(byte[] pic) {
+            Toast.makeText(getApplicationContext(), ""+(pic.length/1024), Toast.LENGTH_LONG).show();
+
+        }
+
+        private int calculateInSampleSize(BitmapFactory.Options options, int reqWidth, int reqHeight) {
+            final int height = options.outHeight;
+            final int width = options.outWidth;
+            int inSampleSize = 1;
+
+            if (height > reqHeight || width > reqWidth) {
+                final int heightRatio = Math.round((float) height / (float) reqHeight);
+                final int widthRatio = Math.round((float) width / (float) reqWidth);
+                inSampleSize = heightRatio < widthRatio ? heightRatio : widthRatio;
+            }
+            final float totalPixels = width * height;
+            final float totalReqPixelsCap = reqWidth * reqHeight * 2;
+
+            while (totalPixels / (inSampleSize * inSampleSize) > totalReqPixelsCap) {
+                inSampleSize++;
+            }
+
+            return inSampleSize;
+        }
+
     }
-
-    @Override
-    public void getImageBitmap(Bitmap bitmap) {
-        img.setImageBitmap(bitmap);
-        mSelectedBitmap = bitmap;
-        mSelectedUri = null;
-    }
-
-
-    public void showFragment() {
-        SelectPhotoDialog photoDialog = new SelectPhotoDialog();
-        photoDialog.show(getSupportFragmentManager(), "selectPhoto");
-    }
-
-
 
     private Bitmap bmap() {
         if (mSelectedBitmap == null) {
@@ -106,99 +197,11 @@ public class CompressActivity extends AppCompatActivity implements SelectPhotoDi
         }
     }
 
-    private long predictSize(Bitmap sBitmap) {
-        ByteArrayOutputStream ou = new ByteArrayOutputStream();
-        sBitmap.compress(Bitmap.CompressFormat.JPEG, 100, ou);
-        byte[] imageInByte = ou.toByteArray();
-        long lengthbyte = imageInByte.length;
-        long length = lengthbyte/1024;
-        return length;
-    }
-
-    private Bitmap iterationCompress(Bitmap img) {
-        long size = predictSize(img);
-        while(size > 200) {
-            ByteArrayOutputStream ou = new ByteArrayOutputStream();
-            img.compress(Bitmap.CompressFormat.JPEG, 75, ou);
-            size = predictSize(img);
-        }
-        Toast.makeText(getApplicationContext(), ""+size, Toast.LENGTH_LONG).show();
-        return img;
-    }
-
-    private void saveImage(Bitmap finalBitmap) {
-        Toast.makeText(getApplicationContext(), "STarting", Toast.LENGTH_LONG).show();
-        long size = predictSize(finalBitmap);
-        Toast.makeText(getApplicationContext(), ""+size, Toast.LENGTH_LONG).show();
-
-//        finalBitmap = iterationCompress(finalBitmap);
-        String root = Environment.getExternalStorageDirectory().toString();
-        File myDir = new File(root + "/saved_images");
-        if (!myDir.exists()) {
-            myDir.mkdirs();
-        }
-        File file = new File (myDir, "Image01.jpg");
-        if (file.exists ())
-            file.delete ();
-        try {
-            FileOutputStream out = new FileOutputStream(file);
-//          FIRST LOGIC:
-//            while (true) {
-//                if(predictSize(finalBitmap) <= 200) {
-//                    finalBitmap.compress(Bitmap.CompressFormat.JPEG, 100, out);
-//                    break;
-//                }
-//                else {
-//                    finalBitmap.compress(Bitmap.CompressFormat.JPEG, 75, out);
-//                }
-//            }
-//          SECOND LOGIC:
-//            while(predictSize(finalBitmap) > 200) {
-//                finalBitmap.compress(Bitmap.CompressFormat.JPEG, 75, out);
-//            }
-//            finalBitmap.compress(Bitmap.CompressFormat.JPEG, 100, out);
-            finalBitmap.compress(Bitmap.CompressFormat.JPEG, 100, out);
-            Toast.makeText(getApplicationContext(), "Done", Toast.LENGTH_LONG).show();
-            out.flush();
-            out.close();
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        Toast.makeText(CompressActivity.this, "Compressed and Downloaded", Toast.LENGTH_SHORT).show();
-    }
-
-    private int getQuality() {
-        long size = predictSize(bmap());
-        if (size <= 200) {
-            quality = 100;
-        } else if (size > 200 && size <= 500) {
-            quality = 75;
-        } else if (size > 500 && size <= 900) {
-            quality = 60;
-        } else if (size > 900 && size <= 1200) {
-            quality = 50;
-        } else if (size > 1200 && size <= 2000) {
-            quality = 40;
-        } else if (size > 2000 && size <= 3000) {
-            quality = 35;
-        } else if (size > 3000 && size <= 4000) {
-            quality = 30;
-        } else if (size > 4000 && size <= 5000) {
-            quality = 25;
-        } else if (size > 5000 && size <= 6000) {
-            quality = 20;
-        } else if (size > 6000 && size <= 7000) {
-            quality = 15;
-        } else if (size > 7000 && size <= 8000) {
-            quality = 10;
-        } else if (size > 8000) {
-            quality = 5;
-        }
-        while (size < 150) {
-
-        }
-        return quality;
+    private byte[] returnByteArray(Bitmap bt) {
+        ByteArrayOutputStream outpput = new ByteArrayOutputStream();
+        bt.compress(Bitmap.CompressFormat.JPEG, 100, outpput);
+        byte[] pict = outpput.toByteArray();
+        return pict;
     }
 
     private void verifyPermissions() {
@@ -221,4 +224,39 @@ public class CompressActivity extends AppCompatActivity implements SelectPhotoDi
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         verifyPermissions();
     }
+
+
+
+    @Override
+    public void getImagePath(Uri imagePath) {
+        mSelectedBitmap = null;
+        mSelectedUri = imagePath;
+        Display display = getWindowManager().getDefaultDisplay();
+        if(bmap().getHeight() > bmap().getWidth()) {
+            Picasso.get()
+                    .load(imagePath.toString())
+                    .resize(img.getWidth(), (int) (0.75*(display.getHeight())))
+                    .centerCrop()
+                    .into(img);
+        } else {
+            Picasso.get()
+                    .load(imagePath.toString())
+                    .fit()
+                    .centerInside()
+                    .into(img);
+        }
+    }
+
+    @Override
+    public void getImageBitmap(Bitmap bitmap) {
+        img.setImageBitmap(bitmap);
+        mSelectedBitmap = bitmap;
+        mSelectedUri = null;
+    }
+
+    public void showFragment() {
+        SelectPhotoDialog photoDialog = new SelectPhotoDialog();
+        photoDialog.show(getSupportFragmentManager(), "selectPhoto");
+    }
 }
+

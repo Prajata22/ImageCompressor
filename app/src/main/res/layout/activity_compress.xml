@@ -9,7 +9,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingBottom="10dp"
+        android:paddingBottom="20dp"
         tools:context=".CompressActivity">
 
 
@@ -28,7 +28,7 @@
             android:layout_marginTop="20dp"
             android:padding="20dp"
             android:shadowColor="#473F3F"
-            android:text="COMPRESS AND DOWNLOAD"
+            android:text="COMPRESS"
             android:textSize="15sp" />
 
     </LinearLayout>
